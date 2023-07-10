@@ -1,0 +1,19 @@
+<policies>
+    <inbound>
+        <base />
+        <set-variable name="scope" value="openid offline_access" />
+        <include-fragment fragment-id="get-access-token" />
+    </inbound>
+    <backend>
+        <return-response>
+            <set-status code="200" reason="OK" />
+            <set-body>@($"Access token Token: {context.Variables.GetValueOrDefault("access-token", "not found")}")</set-body>
+        </return-response>
+    </backend>
+    <outbound>
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>

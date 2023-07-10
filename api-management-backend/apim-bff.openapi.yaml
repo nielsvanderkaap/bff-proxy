@@ -1,0 +1,97 @@
+openapi: 3.0.1
+info:
+  title: BFF proxy
+  description: 'Stateful Bff proxy for a frontend application. This proxy uses AAD as authorization server.'
+  version: '1.0'
+paths:
+  /authorize:
+    get:
+      summary: Authorize
+      description: Authorize user with AAD as Authorization server
+      operationId: authorize
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 
+  /authorized:
+    get:
+      summary: Authorized
+      description: Callback for AAD after authorizing user
+      operationId: 647f01223320fcdb3b900ca2
+      parameters:
+        - name: nonce
+          in: query
+          schema:
+            type: string
+        - name: code
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 
+  /test:
+    get:
+      summary: Return Access Token
+      description: Test endpoint that returns a token
+      operationId: test-endpoint
+      parameters:
+        - name: id_token
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 
+  /userinfo:
+    get:
+      summary: User Info
+      description: Endpoint for obtaining an ID token
+      operationId: authorized
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 
+  /content/*:
+    get:
+      summary: Content
+      description: Endpoint for hosting the static content. This allows the Api and content to have the same origin
+      operationId: content
+      responses:
+        '200':
+          description: 
+components:
+  securitySchemes:
+    apiKeyHeader:
+      type: apiKey
+      name: Ocp-Apim-Subscription-Key
+      in: header
+    apiKeyQuery:
+      type: apiKey
+      name: subscription-key
+      in: query
+security:
+  - apiKeyHeader: [ ]
+  - apiKeyQuery: [ ]

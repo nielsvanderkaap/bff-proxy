@@ -1,0 +1,37 @@
+<fragment>
+	<cache-lookup-value key="@($"at-{((string)context.Variables["session-token"])}-{context.Variables.GetValueOrDefault("scope")}")" variable-name="access-token" />
+	<cache-lookup-value key="@($"rt-{((string)context.Variables["session-token"])}-{context.Variables.GetValueOrDefault("scope")}")" variable-name="refresh-token" />
+	<choose>
+		<!-- Use refresh token to retreive new access token -->
+		<when condition="@(context.Variables.GetValueOrDefault("refresh-token", "") != "" && context.Variables.GetValueOrDefault("access-token", "") == "")">
+			<send-request mode="new" response-variable-name="token-request" timeout="20" ignore-error="true">
+				<set-url>https://login.microsoftonline.com/{{tenant-id}}/oauth2/v2.0/token</set-url>
+				<set-method>POST</set-method>
+				<set-header name="Content-Type" exists-action="override">
+					<value>application/x-www-form-urlencoded</value>
+				</set-header>
+				<set-body template="none">@($"grant_type=refresh_token&client_id={{client-id}}&scope={context.Variables.GetValueOrDefault("scope")}&refresh_token={context.Variables.GetValueOrDefault("refresh-token")}&redirect_uri=https:%2F%2F{context.Request.OriginalUrl.Host}{context.Api.Path}%2Fauthorized&client_secret={{client-secret}}")</set-body>
+			</send-request>
+			<!--<return-response response-variable-name="token-request" />-->
+			<set-variable name="token-response-body" value="@(((IResponse)context.Variables["token-request"]).Body.As<JObject>(true))" />
+			<choose>
+				<when condition="@(((JObject)context.Variables["token-response-body"]).ContainsKey("access_token"))">
+					<set-variable name="access-token" value="@(((JObject)context.Variables["token-response-body"])["access_token"].Value<String>())" />
+					<cache-store-value key="@($"at-{((string)context.Variables["session-token"])}-{context.Variables.GetValueOrDefault("scope")}")" value="@((String)context.Variables["access-token"])" duration="3600" />
+				</when>
+			</choose>
+			<choose>
+				<when condition="@(((JObject)context.Variables["token-response-body"]).ContainsKey("refresh_token"))">
+					<cache-store-value key="@($"rt-{((string)context.Variables["session-token"])}-{context.Variables.GetValueOrDefault("scope")}")" value="@(((JObject)context.Variables["token-response-body"])["refresh_token"].Value<String>())" duration="@(3600*24)" />
+				</when>
+			</choose>
+		</when>
+		<!-- No token available -->
+		<when condition="@(context.Variables.GetValueOrDefault("access-token", "") == "" && context.Variables.GetValueOrDefault("refresh-token", "") == "")">
+			<return-response>
+				<set-status code="401" reason="Unauthorized" />
+				<set-body />
+			</return-response>
+		</when>
+	</choose>
+</fragment>

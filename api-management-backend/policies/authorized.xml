@@ -1,0 +1,72 @@
+<policies>
+    <inbound>
+        <base />
+        <choose>
+            <when condition="@(Convert.ToString(context.Request.Url.Query.GetValueOrDefault("error", "")) == "")">
+                <set-variable name="code" value="@(Convert.ToString(context.Request.Url.Query.GetValueOrDefault("code", "")))" />
+                <set-variable name="full-state" value="@(System.Net.WebUtility.UrlDecode(context.Request.Url.Query.GetValueOrDefault("state", "")))" />
+                <set-variable name="scope" value="@(((string)context.Variables["full-state"]).Split('\\').Length > 0?(System.Net.WebUtility.UrlDecode((string)context.Variables["full-state"]).Split('\\')[0]):"")" />
+                <set-variable name="state" value="@(((string)context.Variables["full-state"]).Split('\\').Length > 1?$"state={((string)context.Variables["full-state"]).Split('\\')[1]}":"")" />
+                <send-request mode="new" response-variable-name="token-request" timeout="20" ignore-error="true">
+                    <set-url>https://login.microsoftonline.com/{{tenant-id}}/oauth2/v2.0/token</set-url>
+                    <set-method>POST</set-method>
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/x-www-form-urlencoded</value>
+                    </set-header>
+                    <set-body template="none">@($"grant_type=authorization_code&client_id={{client-id}}&scope={context.Variables.GetValueOrDefault("scope")}&code={context.Variables.GetValueOrDefault("code")}&redirect_uri=https%3A%2F%2Fi8cndwe-apim.azure-api.net%2Ftest-bff%2Fauthorized&code_verifier={((string)context.Variables["session-token"])}&client_secret={{client-secret}}")</set-body>
+                </send-request>
+                <set-variable name="token-response-body" value="@(((IResponse)context.Variables["token-request"]).Body.As<JObject>(true))" />
+                <choose>
+                    <when condition="@(((JObject)context.Variables["token-response-body"]).ContainsKey("access_token"))">
+                        <set-variable name="access-token" value="@(((JObject)context.Variables["token-response-body"])["access_token"].Value<String>())" />
+                        <cache-store-value key="@($"at-{((string)context.Variables["session-token"])}-{(string)context.Variables["scope"]}")" value="@((String)context.Variables["access-token"])" duration="3600" />
+                    </when>
+                </choose>
+                <choose>
+                    <when condition="@(((JObject)context.Variables["token-response-body"]).ContainsKey("refresh_token"))">
+                        <cache-store-value key="@($"rt-{((string)context.Variables["session-token"])}-{(string)context.Variables["scope"]}")" value="@(((JObject)context.Variables["token-response-body"])["refresh_token"].Value<String>())" duration="@(24*3600)" />
+                    </when>
+                </choose>
+                <choose>
+                    <when condition="@(((IResponse)context.Variables["token-request"]).StatusCode != 200)">
+                        <return-response response-variable-name="token-request" />
+                    </when>
+                    <otherwise>
+                        <return-response>
+                            <set-status code="303" reason="See Other" />
+                            <set-header name="Location" exists-action="override">
+                                <value>{{redirect-uri}}</value>
+                            </set-header>
+                            <set-body />
+                        </return-response>
+                    </otherwise>
+                </choose>
+            </when>
+            <otherwise>
+                <set-variable name="error" value="@(context.Request.Url.Query.GetValueOrDefault("error", "")!=null?$"error={context.Request.Url.Query.GetValueOrDefault("error", "")}":""  )" />
+                <set-variable name="error_uri" value="@(context.Request.Url.Query.GetValueOrDefault("error_uri", "")!=null?$"error_uri={context.Request.Url.Query.GetValueOrDefault("error_uri", "")}":""  )" />
+                <set-variable name="error_description" value="@(context.Request.Url.Query.GetValueOrDefault("error_description", "")!=null?$"error_description={context.Request.Url.Query.GetValueOrDefault("error_description", "")}":""  )" />
+                <set-variable name="state" value="@(context.Request.Url.Query.GetValueOrDefault("state", "")!=null?$"state={context.Request.Url.Query.GetValueOrDefault("state", "")}":""  )" />
+                <return-response>
+                    <set-status code="303" reason="See Other" />
+                    <set-header name="Location" exists-action="override">
+                        <value>{{redirect-uri}}</value>
+                    </set-header>
+                    <set-header name="Set-Cookie" exists-action="override">
+                        <value>@{return $"Session-Token={context.Variables["session-token"]}; Secure; HttpOnly; Max-Age=28800";}</value>
+                    </set-header>
+                    <set-body />
+                </return-response>
+            </otherwise>
+        </choose>
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>

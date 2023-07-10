@@ -1,0 +1,30 @@
+<policies>
+    <inbound>
+        <base />
+        <set-variable name="code-verifier-signature" value="@{
+            System.Security.Cryptography.SHA256 hasher = System.Security.Cryptography.SHA256.Create();
+            return Convert.ToBase64String(hasher.ComputeHash(System.Text.Encoding.ASCII.GetBytes((string)context.Variables["session-token"]))).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        }" />
+        <set-variable name="state-query-parameter" value="@(context.Request.Url.Query.GetValueOrDefault("state", "")!=""?$"&amp;state={context.Request.Url.Query.GetValueOrDefault("scope")}\\{context.Request.Url.Query.GetValueOrDefault("state")}":$"&amp;state={context.Request.Url.Query.GetValueOrDefault("scope")}\\")" />
+        <set-variable name="nonce-query-parameter" value="@(context.Request.Url.Query.GetValueOrDefault("nonce", "")!=""?$"&amp;nonce={context.Request.Url.Query.GetValueOrDefault("nonce")}":"")" />
+        <return-response>
+            <set-status code="303" reason="See Other" />
+            <set-header name="Location" exists-action="override">
+                <value>@($"https://login.microsoftonline.com/{{tenant-id}}/oauth2/v2.0/authorize?response_mode=query&amp;response_type=code&amp;client_id={{client-id}}&amp;code_challenge_method=S256&amp;code_challenge={context.Variables.GetValueOrDefault("code-verifier-signature")}&amp;scope={context.Request.Url.Query.GetValueOrDefault("scope")}{context.Variables["state-query-parameter"]}{context.Variables["nonce-query-parameter"]}")</value>
+            </set-header>
+            <set-header name="Set-Cookie" exists-action="override">
+                <value>@{return $"Session-Token={context.Variables["session-token"]}; Secure; Path=/; HttpOnly; Max-Age=28800";}</value>
+            </set-header>
+            <set-body />
+        </return-response>
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>

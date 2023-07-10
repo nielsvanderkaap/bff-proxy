@@ -1,0 +1,34 @@
+<policies>
+    <inbound>
+        <base />
+        <!-- Determine session token -->
+        <set-variable name="session-token" value="@(context.Request.Headers.GetValueOrDefault("Cookie", "").Split(';').FirstOrDefault( ss => ss.Trim().StartsWith("Session-Token=")))" />
+        <choose>
+            <when condition="@(context.Variables["session-token"] == null)">
+                <set-variable name="session-token" value="@{
+                using (var cryptoProvider = new RNGCryptoServiceProvider())
+                {
+                    byte[] bytes = new byte[64];
+                    cryptoProvider.GetBytes(bytes);                
+                    return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+                }
+                }" />
+            </when>
+            <otherwise>
+                <set-variable name="session-token" value="@(context.Variables.GetValueOrDefault<String>("session-token","Session-Token=").Substring(context.Variables.GetValueOrDefault<String>("session-token","Session-Token=").IndexOf('=')+1))" />
+            </otherwise>
+        </choose>
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+        <set-header name="Set-Cookie" exists-action="override">
+            <value>@{return $"Session-Token={context.Variables["session-token"]}; Path=/; Secure; HttpOnly; Max-Age=28800";}</value>
+        </set-header>
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>

@@ -1,0 +1,21 @@
+<policies>
+    <inbound>
+        <base />
+        <set-variable name="scope" value="@(System.Net.WebUtility.UrlDecode(context.Request.Url.Query.GetValueOrDefault("scope", "")))" />
+        <include-fragment fragment-id="get-access-token" />
+        <set-backend-service base-url="https://graph.microsoft.com" />
+        <rewrite-uri template="oidc/userinfo" />
+        <set-header name="Authorization" exists-action="override">
+            <value>@($"Bearer {context.Variables.GetValueOrDefault("access-token", "")}")</value>
+        </set-header>
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>
