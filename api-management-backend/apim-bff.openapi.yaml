@@ -82,6 +82,28 @@ paths:
       responses:
         '200':
           description: 
+  /refresh:
+    get:
+      summary: Refresh
+      description: Refresh a token with given scopes
+      operationId: refresh
+      parameters:
+        - name: scope
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: nonce
+          in: query
+          schema:
+            type: string
+        - name: state
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description:           
 components:
   securitySchemes:
     apiKeyHeader:
